@@ -23,6 +23,7 @@ class HomeController extends GetxController {
   int _page = 1;
   int _totalPages = 1;
   bool _isFetchingMore = false;
+  int _feedVersion = 0;
 
   bool get hasMore => _page < _totalPages;
 
@@ -56,11 +57,21 @@ class HomeController extends GetxController {
   }
 
   Future<void> refreshDeals() async {
+    final version = ++_feedVersion;
     _page = 1;
-    final res = await dealRepo.fetchDeals(page: 1);
-    _totalPages = res.totalPages;
-    deals.assignAll(res.items);
-    refreshController.refreshCompleted();
+    _isFetchingMore = false;
+    try {
+      final res = await dealRepo.fetchDeals(page: 1);
+      if (version != _feedVersion) return;
+      _totalPages = res.totalPages;
+      deals.assignAll(res.items);
+      refreshController.refreshCompleted();
+    } catch (e) {
+      if (version == _feedVersion) {
+        LogService.error('refresh deals failed', e);
+        refreshController.refreshFailed();
+      }
+    }
   }
 
   Future<void> loadMore() async {
@@ -70,17 +81,23 @@ class HomeController extends GetxController {
       return;
     }
     _isFetchingMore = true;
-    _page++;
+    final version = _feedVersion;
+    final requestedPage = _page + 1;
     try {
-      final res = await dealRepo.fetchDeals(page: _page);
+      final res = await dealRepo.fetchDeals(page: requestedPage);
+      if (version != _feedVersion) return;
       _totalPages = res.totalPages;
-      deals.addAll(res.items);
+      _page = requestedPage;
+      final existingIds = deals.map((deal) => deal.id).toSet();
+      deals.addAll(res.items.where((deal) => existingIds.add(deal.id)));
     } catch (e) {
       LogService.error('loadMore failed', e);
-      _page--;
+    } finally {
+      if (version == _feedVersion) {
+        _isFetchingMore = false;
+        refreshController.loadComplete();
+      }
     }
-    _isFetchingMore = false;
-    refreshController.loadComplete();
   }
 
   void scrollToTop() {
