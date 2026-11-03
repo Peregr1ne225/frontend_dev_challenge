@@ -45,3 +45,26 @@ Two interacting issues caused the bug:
 - **Leaving the screen while the timer is active:** Handled. `dispose()` cancels the timer.
 - **Opening the screen again:** Handled. A new countdown widget starts and calculates the remaining time using the current time.
 - **Countdown reaches the pickup time:** The timer continues refreshing once per second so the widget can show “Pickup window is open.” It is not stopped at that point.
+
+### 3. RES-103 · Requests pile up the longer you browse
+
+#### Root Cause
+
+Each `DealDetailsController` subscribed to `cartService.itemCount` using `ever()`. When the deal page closed, its controller did not remove that listener. The cart service continued holding the old subscriptions, so a later cart change triggered availability checks for deals whose pages had already been closed.
+
+#### Why This Fix Is the Right One
+
+- **Dispose the listener with its owner:** The controller stores the `Worker` returned by `ever()` and disposes it in `onClose()`. This removes the cart subscription when the controller is closed.
+- **Keep availability checking on the active page:** While the deal page is open, cart changes still trigger `_recheckAvailability()` for that deal.
+
+#### Alternatives Considered & Rejected
+
+1. **Check whether the controller is active inside the callback (Rejected):**
+   - This might prevent some work, but the listener would remain subscribed and continue receiving cart changes. Disposing the `Worker` removes the listener itself.
+
+#### Edge Cases Considered
+
+- **Several deal pages opened and closed:** Handled. Each controller disposes its own worker when `onClose()` runs.
+- **Cart changes while a deal page is open:** Handled. Its worker remains active and rechecks that deal’s availability.
+- **Controller retained by GetX after the route closes:** Depends on GetX’s dependency and route configuration. If the controller is retained, `onClose()` runs only when GetX deletes it, so its worker remains active until then. This fix relies on the route binding’s controller being deleted when its route is popped.
+- **In-flight availability request when the controller closes:** Not cancelled. The request may finish after closure; this fix prevents future checks from that listener but does not abort an already-started repository request.
