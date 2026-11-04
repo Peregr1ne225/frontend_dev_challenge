@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../app_config.dart';
+import '../shared_widget/flash_sale_countdown.dart';
 import '../shared_widget/the_network_image.dart';
 import 'deal_details_controller.dart';
 
@@ -79,6 +80,26 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
                           )),
                     ],
                   ),
+                  if (deal.isFlashSale) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.bolt,
+                            size: 18, color: Colors.red),
+                        const SizedBox(width: 6),
+                        const Text('Flash sale ends in',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        FlashSaleCountdown(
+                          endsAt: deal.flashSaleEndsAt!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
