@@ -18,9 +18,8 @@ class HomeScreen extends GetView<HomeController> {
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: Obx(() {
-            final offset = controller.scrollOffset.value;
             return AppBar(
-              elevation: offset > 4 ? 2 : 0,
+              elevation: controller.isScrolled.value ? 2 : 0,
           shadowColor: Colors.black26,
           title: const Row(
             children: [
@@ -104,7 +103,7 @@ class HomeScreen extends GetView<HomeController> {
                   ],
                 ),
               )),
-        floatingActionButton: Obx(() => controller.scrollOffset.value > 800
+        floatingActionButton: Obx(() => controller.showScrollToTop.value
             ? FloatingActionButton.small(
                 onPressed: controller.scrollToTop,
                 child: const Icon(Icons.arrow_upward),

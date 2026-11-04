@@ -15,7 +15,8 @@ class HomeController extends GetxController {
   final flashDeals = <DealModel>[].obs;
   final isLoading = true.obs;
   final todayOnly = false.obs;
-  final scrollOffset = 0.0.obs;
+  final isScrolled = false.obs;
+  final showScrollToTop = false.obs;
 
   final scrollController = ScrollController();
   final refreshController = RefreshController();
@@ -39,7 +40,14 @@ class HomeController extends GetxController {
   }
 
   void _onScroll() {
-    scrollOffset.value = scrollController.offset;
+    final offset = scrollController.offset;
+    final scrolled = offset > 4;
+    final shouldShowScrollToTop = offset > 800;
+
+    if (isScrolled.value != scrolled) isScrolled.value = scrolled;
+    if (showScrollToTop.value != shouldShowScrollToTop) {
+      showScrollToTop.value = shouldShowScrollToTop;
+    }
   }
 
   Future<void> _initialLoad() async {
