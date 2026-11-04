@@ -145,3 +145,33 @@ Several issues contribute to the feed’s performance and memory use:
 **After**
 
 ![DevTools performance after the changes](performance/After.png)
+
+### RES-106 · Wrong pickup times; “Pickup today” filter misses deals
+
+#### Root Cause
+
+The API sends pickup-window timestamps as UTC instants. `PickupWindowModel` parsed them as UTC, then formatted the UTC clock values directly. A pickup time of 06:00 in Thailand can be represented as 23:00 UTC on the previous date, so cards showed the wrong local time.
+
+The `isToday` getter also compared only `start.day` with today’s day number. It did not convert the timestamp to local time or compare the month and year. This caused some pickup windows to be excluded from the “Pickup today” filter.
+
+#### Why This Fix Is the Right One
+
+- **Convert UTC instants to local time:** `fromJson` converts the parsed start and end timestamps with `.toLocal()`, so labels display the device’s local pickup times.
+- **Check for overlap with the local calendar day:** `isToday` checks whether the pickup interval overlaps the range from local midnight today to local midnight tomorrow.
+- **Keep interval checks consistent:** `isOpenNow` and `untilStart` use local representations of the instants, so their calculations and displayed times use the same local clock context.
+
+#### Alternatives Considered & Rejected
+
+1. **Manually add or subtract a fixed number of hours (Rejected):**
+   - A hard-coded adjustment can fail for devices in other time zones and for dates affected by daylight-saving rules. Converting the UTC instant to local time uses the device’s configured time zone.
+
+2. **Change the backend timestamps (Rejected):**
+   - The backend provides valid UTC instants. The client should interpret those instants correctly for local display and calendar filtering.
+
+#### Edge Cases Considered
+
+- **UTC date differs from local date:** Handled. The parsed instant is converted to local time before display and date checks.
+- **Pickup window crosses midnight:** Handled. It counts as today if any part of the interval overlaps today’s local calendar range.
+- **Same day number in a different month or year:** Handled. The overlap check compares full date-time boundaries instead of only the day number.
+- **Window ends exactly at local midnight:** Not considered part of the following day because the end boundary is exclusive.
+- **Device time zone differs from the store’s time zone:** The app displays and filters using the device’s local time zone. If the product requires store-local time while the user is in another time zone, the API/model will need to carry the store’s time-zone identifier.
