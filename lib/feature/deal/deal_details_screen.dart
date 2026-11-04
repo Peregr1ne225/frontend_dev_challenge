@@ -10,8 +10,27 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
 
   @override
   Widget build(BuildContext context) {
-    final deal = controller.deal;
-    return Scaffold(
+    return Obx(() {
+      if (!controller.isLoaded.value) {
+        final error = controller.loadError.value;
+        return Scaffold(
+          appBar: AppBar(title: const Text('Deal')),
+          body: Center(
+            child: error == null
+                ? const CircularProgressIndicator()
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(error),
+                      TextButton(onPressed: Get.back, child: const Text('Back')),
+                    ],
+                  ),
+          ),
+        );
+      }
+
+      final deal = controller.deal;
+      return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -137,6 +156,7 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
           ),
         ),
       ),
-    );
+      );
+    });
   }
 }

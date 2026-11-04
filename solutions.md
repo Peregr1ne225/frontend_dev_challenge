@@ -175,3 +175,31 @@ The `isToday` getter also compared only `start.day` with today’s day number. I
 - **Same day number in a different month or year:** Handled. The overlap check compares full date-time boundaries instead of only the day number.
 - **Window ends exactly at local midnight:** Not considered part of the following day because the end boundary is exclusive.
 - **Device time zone differs from the store’s time zone:** The app displays and filters using the device’s local time zone. If the product requires store-local time while the user is in another time zone, the API/model will need to carry the store’s time-zone identifier.
+
+### RES-107 · Deep link opens to a crash
+
+#### Root Cause
+
+`DealDetailsController.onInit()` expected every navigation to pass a `DealModel` through `Get.arguments`. Opening a deal from the home feed does pass that model. A deep link such as `/deal?id=42&source=push` passes the ID as a route query parameter instead, leaving `Get.arguments` null. The controller then tried to use a null value as a `DealModel`, causing the crash.
+
+#### Why This Fix Is the Right One
+
+- **Support both navigation paths:** The controller uses a `DealModel` argument when one is provided, and fetches the deal by the route’s `id` when it isn’t.
+- **Wait for the deal before building details:** The screen shows a loading indicator while the deep-link request is in progress. It builds the normal detail page after the controller loads the deal.
+- **Handle link and API errors:** An invalid ID or failed fetch displays an error with a Back button instead of accessing an uninitialized deal.
+
+#### Alternatives Considered & Rejected
+
+1. **Force the deep link to supply a `DealModel` argument (Rejected):**
+   - Push notifications provide a deal ID in the URL, not an in-memory model. The details route must be able to fetch the model.
+
+2. **Silently use a placeholder deal when the argument is missing (Rejected):**
+   - This could display incorrect deal information. Fetching by ID returns the matching deal or shows an error if it cannot be found.
+
+#### Edge Cases Considered
+
+- **Open from the home feed with a `DealModel` argument — handled:** The controller uses the passed model without an additional initial fetch.
+- **Open from a deep link with a valid `id` — handled:** The controller fetches the deal by ID and displays it after loading.
+- **Missing or non-numeric `id` — handled:** The screen shows “This deal link is invalid” and a Back button.
+- **Unknown deal ID or failed API request — handled:** The failure is logged, and the screen shows “This deal could not be found” with a Back button.
+- **Add to bag before the deal loads — guarded:** The controller returns without adding anything until a deal has been initialized.
