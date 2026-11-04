@@ -14,11 +14,13 @@ class HomeScreen extends GetView<HomeController> {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final offset = controller.scrollOffset.value;
-      return Scaffold(
-        appBar: AppBar(
-          elevation: offset > 4 ? 2 : 0,
+    return Scaffold(
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Obx(() {
+            final offset = controller.scrollOffset.value;
+            return AppBar(
+              elevation: offset > 4 ? 2 : 0,
           shadowColor: Colors.black26,
           title: const Row(
             children: [
@@ -58,8 +60,10 @@ class HomeScreen extends GetView<HomeController> {
               ],
             ),
           ],
+            );
+          }),
         ),
-        body: controller.isLoading.value
+        body: Obx(() => controller.isLoading.value
             ? ListView(
                 children: const [
                   ShimmerDealCard(),
@@ -99,15 +103,14 @@ class HomeScreen extends GetView<HomeController> {
                     const SizedBox(height: 24),
                   ],
                 ),
-              ),
-        floatingActionButton: offset > 800
+              )),
+        floatingActionButton: Obx(() => controller.scrollOffset.value > 800
             ? FloatingActionButton.small(
                 onPressed: controller.scrollToTop,
                 child: const Icon(Icons.arrow_upward),
               )
-            : null,
+            : const SizedBox.shrink()),
       );
-    });
   }
 
   void _showDeepLinkDialog(BuildContext context) {
