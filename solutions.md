@@ -203,3 +203,28 @@ The `isToday` getter also compared only `start.day` with today’s day number. I
 - **Missing or non-numeric `id` — handled:** The screen shows “This deal link is invalid” and a Back button.
 - **Unknown deal ID or failed API request — handled:** The failure is logged, and the screen shows “This deal could not be found” with a Back button.
 - **Add to bag before the deal loads — guarded:** The controller returns without adding anything until a deal has been initialized.
+
+### F-1 · Live Flash-Sale Countdown Feature
+
+#### Feature Overview
+
+Flash-sale deals now show a live countdown in the flash rail, home feed cards, and deal details. The countdown displays `mm:ss`, or `hh:mm:ss` when one hour or more remains.
+
+#### What Changed
+
+- Added one shared `FlashSaleClock` that updates once per second.
+- Added a reusable `FlashSaleCountdown` widget. Its observer is scoped to the countdown text, so cards and the feed do not rebuild every second.
+- Added an expired state for each deal. When the sale ends, cards become dimmed and disabled, and the details screen disables its Add to bag button.
+- Updated `CartService` to reject expired deals, remove expired deals already in the bag, recalculate the cart, and show a notice.
+- Added an immediate clock refresh when the app resumes from the background.
+
+#### Expiry Behavior
+
+- Deals without a `flashSaleEndsAt` value do not show a countdown and retain normal cart behavior.
+- Expired deals show “Expired” and cannot be added to the bag.
+- When several bag items expire together, the cart removes them in one sweep and displays one combined notice.
+- Checkout removes expired items before submitting.
+
+#### Performance and Verification
+
+The app uses one timer for all countdowns. Per-second updates rebuild the countdown text; the card and add button update only when their deal expires.
