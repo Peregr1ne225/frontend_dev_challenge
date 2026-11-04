@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../app_config.dart';
 import '../../model/deal_model.dart';
 import '../../routes/routes.dart';
+import '../../service/flash_sale_clock.dart';
 import 'flash_sale_countdown.dart';
 import 'the_network_image.dart';
 
@@ -16,16 +17,28 @@ class DealCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    if (!deal.isFlashSale) return _buildCard(expired: false);
+
+    final expiredState = Get.find<FlashSaleClock>()
+        .expiredStateFor(deal.id, deal.flashSaleEndsAt!);
+    return Obx(() => _buildCard(expired: expiredState.value));
+  }
+
+  Widget _buildCard({required bool expired}) {
+    return Opacity(
+      opacity: expired ? 0.55 : 1,
+      child: Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       clipBehavior: Clip.antiAlias,
       color: Colors.white,
       elevation: 0.5,
       child: InkWell(
-        onTap: () => Get.toNamed(
-          Routes.dealRoute(deal.id, source: source),
-          arguments: deal,
-        ),
+        onTap: expired
+            ? null
+            : () => Get.toNamed(
+                  Routes.dealRoute(deal.id, source: source),
+                  arguments: deal,
+                ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -40,10 +53,18 @@ class DealCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade600,
+                        color: expired ? Colors.grey.shade700 : Colors.red.shade600,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Column(
+                      child: expired
+                          ? const Text(
+                              'Expired',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold),
+                            )
+                          : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -151,6 +172,7 @@ class DealCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

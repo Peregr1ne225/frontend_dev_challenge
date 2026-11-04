@@ -20,7 +20,7 @@ class FlashSaleCountdown extends StatelessWidget {
     return Obx(() {
       final remaining = endsAt.difference(clock.now.value);
       if (remaining <= Duration.zero) {
-        return Text('00:00', style: style);
+        return Text('Expired', style: style);
       }
 
       final totalSeconds = (remaining.inMilliseconds + 999) ~/ 1000;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../app_config.dart';
+import '../../service/flash_sale_clock.dart';
 import '../shared_widget/flash_sale_countdown.dart';
 import '../shared_widget/the_network_image.dart';
 import 'deal_details_controller.dart';
@@ -31,6 +32,10 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
       }
 
       final deal = controller.deal;
+      final expiredState = deal.flashSaleEndsAt == null
+          ? null
+          : Get.find<FlashSaleClock>()
+              .expiredStateFor(deal.id, deal.flashSaleEndsAt!);
       return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -170,11 +175,20 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
         color: Colors.white,
         child: SizedBox(
           width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: controller.addToCart,
-            icon: const Icon(Icons.add_shopping_cart),
-            label: const Text('Add to bag'),
-          ),
+          child: expiredState == null
+              ? FilledButton.icon(
+                  onPressed: controller.addToCart,
+                  icon: const Icon(Icons.add_shopping_cart),
+                  label: const Text('Add to bag'),
+                )
+              : Obx(() {
+                  final expired = expiredState.value;
+                  return FilledButton.icon(
+                    onPressed: expired ? null : controller.addToCart,
+                    icon: const Icon(Icons.add_shopping_cart),
+                    label: Text(expired ? 'Expired' : 'Add to bag'),
+                  );
+                }),
         ),
       ),
       );
