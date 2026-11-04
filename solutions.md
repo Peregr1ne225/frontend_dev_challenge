@@ -101,3 +101,47 @@ Before the fix, `loadMore()` incremented `_page`, fetched that page, and appende
 - **Response contains deal IDs already in the feed — handled:** Duplicate IDs are filtered before appending.
 - **Refresh request fails — handled:** The failure is logged and the refresh controller is notified; existing feed items remain visible.
 - **Cancel an in-flight network request — not handled:** The repository doesn’t provide cancellation. The response is allowed to finish but is ignored if refresh made it stale.
+
+### RES-105 · Home feed is janky and memory keeps climbing
+
+#### Root Cause
+
+Several issues contribute to the feed’s performance and memory use:
+
+1. **Broad scroll observer:** Originally, one `Obx` wrapped the entire `Scaffold` and watched the scroll offset. Scroll updates therefore rebuilt the screen and feed. The observers are now separated: the app bar and floating button watch threshold booleans, and the body watches feed state.
+2. **Images decoded larger than displayed:** `CachedNetworkImage` originally had no decode-size hint. `TheNetworkImage` now sets `memCacheWidth` based on the available display width and device pixel ratio. It uses width only to preserve the image’s original proportions and `BoxFit.cover` crop.
+3. **Feed creates widget configurations for all loaded deals:** The current `ListView(children: ...)` creates a `DealCard` widget configuration for each loaded deal when the body rebuilds. Flutter still lazily mounts visible child subtrees; it does not render every card at once. A `SliverList.builder` version was tried and reverted.
+4. **Raster paint cost remains unresolved:** DevTools showed slow paint frames and traces mentioning `Shimmer` and `Container`. Replacing the image shimmer with a static placeholder did not help, so that change was reverted. Shimmer is not confirmed as the raster bottleneck.
+
+#### Why This Fix Is the Right One
+
+- **Narrow the scroll observers:** Scrolling updates the app bar and floating button state without rebuilding the whole `Scaffold` and feed.
+- **Decode images near their display width:** Smaller decoded images should reduce image memory use while keeping their aspect ratio.
+- **Use DevTools evidence to guide raster changes:** The observer change targets widget rebuild work. It does not guarantee lower raster time, so raster work needs separate investigation.
+
+#### Alternatives Considered & Rejected
+
+1. **Replace image shimmer with a static placeholder (Tried, then reverted):**
+   - It did not improve the observed performance, so the shimmer was restored.
+
+2. **Use `SliverList.builder` for deal cards (Tried, then reverted):**
+   - The change was not kept; the feed currently uses `ListView(children: ...)`.
+
+#### Edge Cases Considered
+
+- **Scroll crosses the app bar threshold:** Handled. The app bar updates when scrolling past 4 pixels.
+- **Scroll crosses the floating button threshold:** Handled. The button updates when scrolling past 800 pixels.
+- **Images have different aspect ratios:** Handled in the decode-size change by setting `memCacheWidth` without `memCacheHeight`, preserving image proportions for `BoxFit.cover`.
+- **Image cache memory improvement:** Not measured. The width hint is intended to reduce decoded-image memory, but no before/after memory measurements are available.
+- **Raster paint performance:** Not resolved. The static shimmer experiment did not help, and other paint costs still need investigation.
+- **Before/after frame evidence:** In before it show more janky performance bar more than after. Because my computer are a bit old so emulator framerates is so low. You can't use fps as performance check
+
+#### DevTools Evidence
+
+**Before**
+
+![DevTools performance before the changes](performance/Before.png)
+
+**After**
+
+![DevTools performance after the changes](performance/After.png)
