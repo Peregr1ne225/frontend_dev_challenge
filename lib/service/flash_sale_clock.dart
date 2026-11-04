@@ -1,9 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 /// A single app-wide clock shared by visible flash-sale countdowns.
-class FlashSaleClock extends GetxService {
+class FlashSaleClock extends GetxService with WidgetsBindingObserver {
   DateTime _currentTime = DateTime.now();
   final now = DateTime.now().obs;
   final _endsAtByDealId = <int, DateTime>{};
@@ -14,9 +15,15 @@ class FlashSaleClock extends GetxService {
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       _tick();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _tick();
   }
 
   RxBool expiredStateFor(int dealId, DateTime endsAt) {
@@ -54,6 +61,7 @@ class FlashSaleClock extends GetxService {
   @override
   void onClose() {
     _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.onClose();
   }
 }
