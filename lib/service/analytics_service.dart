@@ -33,6 +33,30 @@ class AnalyticsService extends GetxService {
   /// the visibility and dwell-time requirements have been met.
   bool markDealImpression(int dealId) => _impressedDealIds.add(dealId);
 
+  /// Records a qualifying impression once per deal for this app session.
+  ///
+  /// [source] must identify the list containing the card, and [position] is
+  /// its zero-based index in that list.
+  bool logDealImpression({
+    required int dealId,
+    required String source,
+    required int position,
+  }) {
+    const validSources = {'home_feed', 'flash_rail', 'search'};
+    if (!validSources.contains(source)) {
+      throw ArgumentError.value(source, 'source', 'Unsupported impression source');
+    }
+
+    if (!markDealImpression(dealId)) return false;
+
+    logEvent('deal_impression', {
+      'deal_id': dealId,
+      'source': source,
+      'position': position,
+    });
+    return true;
+  }
+
   void logEvent(String name, [Map<String, dynamic> properties = const {}]) {
     final event = AnalyticsEvent(name, properties);
     events.add(event);
