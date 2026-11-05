@@ -1,6 +1,6 @@
 # Solutions — Rescu Assessment
 
-## Part C — Written Deliverables
+## 1. **Per ticket/feature you worked on:**
 
 ### RES-101 · Search shows results for the wrong query
 
@@ -320,3 +320,26 @@ After a checkout `410`, the bag is preserved to avoid losing the user’s select
 - **A reservation request completes after its unit was removed:** The returned hold is released instead of being attached to the bag.
 - **Only some units are successfully re-reserved:** Successful holds remain; other units stay visible as unreserved and can be retried.
 - **Reservation release fails:** The failure is logged. The backend hold will expire after its five-minute lifetime.
+
+## 2. **AI usage log:**
+
+### 1. Which tools you used and for what.
+I use Antigravity and Codex to identify problems and generate step-by-step fix plans. Once I review the plan for errors, I let the AI apply the fixes. Afterwards, I review the changes to understand what every step did. If something doesn't work, I instruct it to fix the issue according to my preferences, and finally, I have it generate a detailed report of everything it did.
+
+### 2. At least **two concrete examples where an AI suggestion was wrong or misleading**, how you caught it, and what you did instead.
+- Since AI can't open DevTools or run the Android emulator, it can't observe live issues directly, which can lead to misleading diagnoses. To fix this, I personally run the app on an emulator and use DevTools to profile performance and test code changes directly.
+- It recommended methods that weren't strictly necessary for this test—like in RES-101, where it suggested adding both search versioning and debouncing. Although debouncing alone fixes the problem, the suggestion to add search versioning isn't wrong, so I think it's worth keeping to make the solution more robust.
+
+## 3. **Design questions**
+
+### Q1 
+A GetxController is managed by GetX. It has lifecycle hooks such as `onInit()` and `onClose()`, and its lifetime depends on how it’s registered. A widget State is managed by Flutter: it starts at `initState()` and ends at `dispose()` when that widget is removed from the tree. RES-103 is the example: a deal-details controller created an `ever()` Worker listening to shared cart state. Removing the screen’s widgets doesn’t automatically stop that Worker. It must be disposed when its controller closes, using `_cartWorker?.dispose()` in `onClose()`. Otherwise, old listeners keep triggering requests after the user leaves the deal page.
+
+### Q2
+It's unnecessary to rebuild an entire widget tree when a frequently changing Rx value is read inside it. Wrapping a large subtree in an Obx will cause non-essential parts to rebuild. Instead, you should isolate the reactive code—separating the components that need to refresh from those that don't, or grouping them by how frequently they update (like keeping the AppBar static while making the Body reactive).
+
+### Q3
+I will check if api time `.toLocal()` is equal to time that shop open. Test an overnight pickup window that overlaps today but starts the previous day. To make the filter test deterministic, I’d add an `isTodayAt(DateTime now)` method and inject a clock into HomeController, which currently reads the real current time through `isToday`. The test can supply a fixed time and assert the deal appears when todayOnly is enabled. I’d keep the existing `toLocal()` conversion and interval-overlap logic.
+
+## 4. **Time spent**
+I spent three days working on this task. If I had one more day, I would track down and fix additional unlisted bugs—such as an issue where adding an item to the bag and checking out doesn't decrease the deal quantity until `Add to Bag` is clicked a second time.
