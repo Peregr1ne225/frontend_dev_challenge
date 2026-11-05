@@ -58,7 +58,11 @@ class CartScreen extends GetView<CartController> {
                                   color: AppConfig.primaryGreen,
                                   fontWeight: FontWeight.w600)),
                           const SizedBox(height: 4),
-                          ReservationStatus(item: item),
+                          ReservationStatus(
+                            item: item,
+                            onRetryReservations: () =>
+                                cart.retryReservations(item.deal.id),
+                          ),
                         ],
                       ),
                     ),

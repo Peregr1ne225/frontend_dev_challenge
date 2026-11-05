@@ -42,11 +42,20 @@ class CartController extends GetxController {
       );
     } on ApiException catch (e) {
       LogService.error('checkout failed', e);
-      Get.snackbar(
-        'Checkout failed',
-        e.message,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      if (e.statusCode == 410) {
+        cartService.invalidateReservationsAfterCheckoutFailure();
+        Get.snackbar(
+          'Reservation expired',
+          'Your bag is saved. Reserve the items again before checking out.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar(
+          'Checkout failed',
+          e.message,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     } finally {
       isCheckingOut.value = false;
     }

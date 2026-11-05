@@ -8,8 +8,13 @@ import '../../service/flash_sale_clock.dart';
 /// Only this status text observes the shared one-second clock.
 class ReservationStatus extends StatelessWidget {
   final CartItemModel item;
+  final VoidCallback? onRetryReservations;
 
-  const ReservationStatus({super.key, required this.item});
+  const ReservationStatus({
+    super.key,
+    required this.item,
+    this.onRetryReservations,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -43,15 +48,35 @@ class ReservationStatus extends StatelessWidget {
       }
 
       if (messages.isEmpty) return const SizedBox.shrink();
-      return Text(
-        messages.join(' · '),
-        style: TextStyle(
-          fontSize: 11.5,
-          color: item.unreservedQuantity > 0 ||
-                  item.reservations.any((reservation) => reservation.isExpired)
-              ? Colors.red.shade700
-              : Colors.grey.shade600,
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            messages.join(' · '),
+            style: TextStyle(
+              fontSize: 11.5,
+              color: item.unreservedQuantity > 0 ||
+                      item.reservations
+                          .any((reservation) => reservation.isExpired)
+                  ? Colors.red.shade700
+                  : Colors.grey.shade600,
+            ),
+          ),
+          if (item.unreservedQuantity > 0 &&
+              item.pendingReservations == 0 &&
+              onRetryReservations != null)
+            TextButton(
+              onPressed: onRetryReservations,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 30),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                alignment: Alignment.centerLeft,
+              ),
+              child: const Text('Reserve again'),
+            ),
+        ],
       );
     });
   }

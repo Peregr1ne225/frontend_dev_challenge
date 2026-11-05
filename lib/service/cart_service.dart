@@ -23,6 +23,7 @@ class CartService extends GetxService {
   final items = <CartItemModel>[].obs;
   final itemCount = 0.obs;
   final Map<int, List<_PendingCartAdd>> _pendingAddsByDeal = {};
+  final Set<int> _reservationRetriesInProgress = {};
   Worker? _clockWorker;
 
   @override
@@ -30,6 +31,7 @@ class CartService extends GetxService {
     super.onInit();
     _clockWorker = ever(Get.find<FlashSaleClock>().now, (_) {
       _removeExpiredItems();
+      _removeExpiredReservations();
     });
   }
 
@@ -162,6 +164,68 @@ class CartService extends GetxService {
 
   void removeExpiredItems() {
     _removeExpiredItems();
+    _removeExpiredReservations();
+  }
+
+  /// Recreates holds for units preserved in the bag after a checkout 410.
+  Future<void> retryReservations(int dealId) async {
+    final item = items.firstWhereOrNull((i) => i.deal.id == dealId);
+    if (item == null || !_reservationRetriesInProgress.add(dealId)) return;
+
+    try {
+      while (items.any((current) => identical(current, item)) &&
+          item.unreservedQuantity > 0) {
+        item.pendingReservations++;
+        items.refresh();
+
+        final operation = _PendingCartAdd();
+        (_pendingAddsByDeal[dealId] ??= <_PendingCartAdd>[]).add(operation);
+
+        try {
+          final reservation = await orderRepo.reserve(dealId, quantity: 1);
+          _removePendingAdd(dealId, operation);
+
+          if (operation.cancelled ||
+              !items.any((current) => identical(current, item))) {
+            await _releaseReservation(reservation.id);
+            return;
+          }
+
+          item.reservations.add(reservation);
+          item.pendingReservations--;
+          items.refresh();
+        } catch (error) {
+          _removePendingAdd(dealId, operation);
+          if (operation.cancelled ||
+              !items.any((current) => identical(current, item))) {
+            return;
+          }
+
+          item.pendingReservations--;
+          items.refresh();
+          LogService.error('reservation retry failed for deal $dealId', error);
+          Get.snackbar(
+            'Could not reserve this deal',
+            'Your bag is saved, but a unit could not be held. Please try again.',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+          return;
+        }
+      }
+    } finally {
+      _reservationRetriesInProgress.remove(dealId);
+    }
+  }
+
+  /// Keeps the bag visible after checkout rejects a hold, but no longer treats
+  /// any submitted reservation as active because the API doesn't identify the
+  /// specific reservation that failed.
+  void invalidateReservationsAfterCheckoutFailure() {
+    for (final item in items) {
+      _releaseReservations(item);
+      item.reservations.clear();
+    }
+    items.refresh();
   }
 
   num get total => items.fold(0, (sum, i) => sum + i.lineTotal);
@@ -220,6 +284,38 @@ class CartService extends GetxService {
     final names = expiredItems.map((item) => item.deal.name).toList();
     if (notify) _showExpiredNotice(names);
     return names;
+  }
+
+  void _removeExpiredReservations() {
+    final expiredDealNames = <String>{};
+
+    for (final item in items.toList()) {
+      final expired =
+          item.reservations.where((reservation) => reservation.isExpired);
+      final expiredQuantity = expired.fold<int>(
+        0,
+        (total, reservation) => total + reservation.quantity,
+      );
+      if (expiredQuantity == 0) continue;
+
+      item.reservations.removeWhere((reservation) => reservation.isExpired);
+      item.quantity -= expiredQuantity;
+      if (item.quantity <= 0) {
+        _cancelPendingAdds(item.deal.id);
+        items.remove(item);
+      } else {
+        items.refresh();
+      }
+      expiredDealNames.add(item.deal.name);
+    }
+
+    if (expiredDealNames.isEmpty) return;
+    _recount();
+    Get.snackbar(
+      'Reservation expired',
+      'Expired units were removed from your bag: ${expiredDealNames.join(', ')}.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   void _showExpiredNotice(List<String> names, {bool rejectedAdd = false}) {
