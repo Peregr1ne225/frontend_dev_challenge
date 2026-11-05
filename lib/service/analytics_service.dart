@@ -23,6 +23,16 @@ class AnalyticsEvent {
 class AnalyticsService extends GetxService {
   final events = <AnalyticsEvent>[].obs;
 
+  // Retained for the lifetime of this GetX service, so impressions are
+  // deduplicated across screens during the app session.
+  final Set<int> _impressedDealIds = <int>{};
+
+  /// Marks [dealId] as impressed for this app session.
+  ///
+  /// Returns true only the first time the deal is accepted. Call this after
+  /// the visibility and dwell-time requirements have been met.
+  bool markDealImpression(int dealId) => _impressedDealIds.add(dealId);
+
   void logEvent(String name, [Map<String, dynamic> properties = const {}]) {
     final event = AnalyticsEvent(name, properties);
     events.add(event);
