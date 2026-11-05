@@ -228,3 +228,47 @@ Flash-sale deals now show a live countdown in the flash rail, home feed cards, a
 #### Performance and Verification
 
 The app uses one timer for all countdowns. Per-second updates rebuild the countdown text; the card and add button update only when their deal expires.
+
+### F-2 · Impression Tracking
+
+#### Feature Overview
+
+Deal cards in the home feed, flash rail, and search results are tracked as impressions when they remain at least 50% visible for one continuous second.
+
+Each event includes:
+- deal_id
+- source: home_feed, flash_rail, or search
+- position: the card’s zero-based index in its list
+
+#### What Changed
+
+- Added session-wide deduplication in AnalyticsService, so each deal is recorded at most once per app session, even if it appears in multiple lists or screens.
+- Added a reusable DealImpressionTracker using VisibilityDetector to observe a card’s visible fraction.
+- Connected the tracker to home feed cards, flash rail cards, and search result cards.
+- Added logDealImpression(...), which records deal_impression with deal_id, source, and position.
+- Added analytics batching through FakeApiService.sendAnalyticsBatch. Events are sent when 10 accumulate or 15 seconds pass since the first queued event.
+- Kept events in the Analytics Debug history after sending. Failed sends stay queued and the service schedules a retry.
+- Added onClose() cleanup to cancel the batch timer and make a best-effort attempt to send pending events if GetX disposes the service.
+
+#### Impression Behavior
+
+- At 50% visibility, the tracker starts a one-second timer.
+- If visibility falls below 50% before the timer ends, it cancels the timer.
+- If the card remains visible for the full second, the tracker calls the impression callback.
+- If the tracker is removed, it cancels its timer.
+- The service ignores a deal ID already recorded during the current app session.
+- Valid sources are home_feed, flash_rail, and search.
+
+#### Analytics Batching
+
+logEvent immediately adds events to the in-app analytics history, where they can appear in the Analytics Debug screen. It also queues them for delivery through FakeApiService.sendAnalyticsBatch.
+
+The service sends the queue when it reaches 10 events or 15 seconds pass since the first queued event. Events remain queued if sending fails, and the service schedules a retry.
+
+#### Service Cleanup
+
+If GetX disposes AnalyticsService, its timer is canceled and it makes a best-effort attempt to send pending events. Since onClose() is synchronous, delivery during disposal is not guaranteed. The service is registered as permanent, so normal screen navigation does not close it.
+
+#### Performance Verification
+
+The tracker itself does not call setState as visibility changes.
