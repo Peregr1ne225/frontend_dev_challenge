@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../app_config.dart';
 import '../shared_widget/the_network_image.dart';
 import 'cart_controller.dart';
+import 'reservation_status.dart';
 
 class CartScreen extends GetView<CartController> {
   const CartScreen({super.key});
@@ -56,6 +57,8 @@ class CartScreen extends GetView<CartController> {
                                   fontSize: 13,
                                   color: AppConfig.primaryGreen,
                                   fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          ReservationStatus(item: item),
                         ],
                       ),
                     ),
