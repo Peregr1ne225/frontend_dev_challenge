@@ -272,3 +272,51 @@ If GetX disposes AnalyticsService, its timer is canceled and it makes a best-eff
 #### Performance Verification
 
 The tracker itself does not call setState as visibility changes.
+
+### F-3 · Stock Reservations with Optimistic UI
+
+#### Feature Overview
+
+Bag units are now backed by five-minute stock reservations. Adding a unit updates the bag immediately while the reservation request runs. If the request fails, that unit is removed and the user sees a clear message.
+
+#### What Changed
+
+- `CartItemModel` now stores a list of reservation holds, the number of pending reservations, and derived confirmed and unreserved quantities.
+- `CartService` now uses `OrderRepo` to reserve and release stock.
+- Adding a unit immediately updates the bag, then requests a one-unit reservation.
+- If reservation succeeds, its ID and expiry are stored on the bag line.
+- If reservation fails, only the unit from that request is rolled back.
+- Removing or decrementing a line releases its confirmed reservation. Clearing the bag releases all holds.
+- Pending reservation requests are canceled when their unit or line is removed. If a canceled request succeeds later, its hold is released.
+- The cart displays reservation status and a countdown to the earliest hold expiry on each line. The countdown updates only its status text.
+- Checkout sends each reservation ID with its deal ID and quantity.
+- Checkout is blocked while any unit is pending, unreserved, or expired.
+
+#### Reservation Expiry Behavior
+
+- Each unit has its own reservation, so holds can expire at different times.
+- When a hold expires while the user is in the app, that unit is removed and the app shows a notice. Other units with valid holds stay in the bag.
+- If checkout returns `410`, the API does not identify which hold failed. The app therefore invalidates all holds submitted in that checkout, releases the remaining holds, and keeps the bag quantities.
+- The user can select **Reserve again** on a line. One tap attempts to reserve all unreserved units on that line, one unit at a time. If an attempt fails, successful holds remain and the user can retry the remaining units.
+- Checkout is not retried automatically; the user must review and submit again after the holds are restored.
+- A non-`410` checkout failure, such as the simulated `502` payment timeout, leaves the bag and its holds in place so the user can retry while those holds remain valid.
+
+#### Product Decision
+
+Expired units are removed during normal browsing so the bag doesn’t imply the user still holds stock. Other valid units are preserved.
+
+After a checkout `410`, the bag is preserved to avoid losing the user’s selections. All submitted reservation IDs are invalidated because the API doesn’t identify which one failed. The user explicitly requests new holds before checking out again.
+
+#### Alternatives Considered
+
+- **Leave expired units in the bag as reserved:** Rejected because checkout could treat unavailable stock as held.
+- **Automatically reserve again after expiry or `410`:** Rejected because stock may have changed; the user should choose to try again.
+- **Automatically retry checkout after `410`:** Rejected because the reservations changed and the user should review the bag before another checkout attempt.
+
+#### Edge Cases Considered
+
+- **One hold expires on a multi-unit line:** Only that unit is removed.
+- **Several holds expire together:** All expired units are removed, while valid holds remain.
+- **A reservation request completes after its unit was removed:** The returned hold is released instead of being attached to the bag.
+- **Only some units are successfully re-reserved:** Successful holds remain; other units stay visible as unreserved and can be retried.
+- **Reservation release fails:** The failure is logged. The backend hold will expire after its five-minute lifetime.
