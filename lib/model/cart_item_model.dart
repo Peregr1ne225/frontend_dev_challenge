@@ -28,10 +28,5 @@ class CartItemModel {
   int get unreservedQuantity =>
       quantity - confirmedQuantity - pendingReservations;
 
-  /// Temporary compatibility for checkout until it serializes every hold.
-  /// New reservation code should use [reservations].
-  ReservationModel? get reservation =>
-      reservations.length == 1 ? reservations.first : null;
-
   num get lineTotal => deal.price * quantity;
 }

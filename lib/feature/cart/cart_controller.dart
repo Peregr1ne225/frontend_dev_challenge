@@ -18,10 +18,23 @@ class CartController extends GetxController {
     cartService.removeExpiredItems();
     if (cartService.items.isEmpty) return;
 
+    final hasUnavailableUnits = cartService.items.any((item) =>
+        item.pendingReservations > 0 ||
+        item.unreservedQuantity > 0 ||
+        item.reservations.any((reservation) => reservation.isExpired));
+    if (hasUnavailableUnits) {
+      Get.snackbar(
+        'Bag needs attention',
+        'Wait for reservations to finish or remove items that are not reserved.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
     isCheckingOut.value = true;
     try {
       final order = await orderRepo.checkout(cartService.items.toList());
-      cartService.clear();
+      cartService.clear(releaseReservations: false);
       Get.snackbar(
         'Order confirmed',
         'Order #${order.id} — pick up soon!',
@@ -34,7 +47,8 @@ class CartController extends GetxController {
         e.message,
         snackPosition: SnackPosition.BOTTOM,
       );
+    } finally {
+      isCheckingOut.value = false;
     }
-    isCheckingOut.value = false;
   }
 }

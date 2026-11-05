@@ -145,7 +145,7 @@ class CartService extends GetxService {
     item.reservations.clear();
   }
 
-  void clear() {
+  void clear({bool releaseReservations = true}) {
     final removedItems = items.toList();
     for (final item in removedItems) {
       _cancelPendingAdds(item.deal.id);
@@ -155,7 +155,7 @@ class CartService extends GetxService {
     _recount();
 
     for (final item in removedItems) {
-      _releaseReservations(item);
+      if (releaseReservations) _releaseReservations(item);
       item.reservations.clear();
     }
   }
