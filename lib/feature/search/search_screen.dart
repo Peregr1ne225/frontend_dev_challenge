@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../service/analytics_service.dart';
+import '../shared_widget/deal_impression_tracker.dart';
 import '../shared_widget/deal_card.dart';
 import 'search_deals_controller.dart';
 
@@ -38,10 +40,22 @@ class SearchScreen extends GetView<SearchDealsController> {
         }
         return ListView.builder(
           itemCount: controller.results.length,
-          itemBuilder: (context, index) => DealCard(
-            deal: controller.results[index],
-            source: 'search',
-          ),
+          itemBuilder: (context, index) {
+            final deal = controller.results[index];
+            return DealImpressionTracker(
+              key: ValueKey('search_impression_${deal.id}_$index'),
+              onImpression: () => Get.find<AnalyticsService>()
+                  .logDealImpression(
+                    dealId: deal.id,
+                    source: 'search',
+                    position: index,
+                  ),
+              child: DealCard(
+                deal: deal,
+                source: 'search',
+              ),
+            );
+          },
         );
       }),
     );

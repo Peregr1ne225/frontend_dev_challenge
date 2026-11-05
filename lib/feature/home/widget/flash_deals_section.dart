@@ -4,7 +4,9 @@ import 'package:get/get.dart';
 import '../../../app_config.dart';
 import '../../../model/deal_model.dart';
 import '../../../routes/routes.dart';
+import '../../../service/analytics_service.dart';
 import '../../../service/flash_sale_clock.dart';
+import '../../shared_widget/deal_impression_tracker.dart';
 import '../../shared_widget/flash_sale_countdown.dart';
 import '../../shared_widget/the_network_image.dart';
 
@@ -41,7 +43,15 @@ class FlashDealsSection extends StatelessWidget {
               final deal = deals[index];
               final expiredState = Get.find<FlashSaleClock>()
                   .expiredStateFor(deal.id, deal.flashSaleEndsAt!);
-              return Obx(() {
+              return DealImpressionTracker(
+                key: ValueKey('flash_rail_impression_${deal.id}_$index'),
+                onImpression: () => Get.find<AnalyticsService>()
+                    .logDealImpression(
+                      dealId: deal.id,
+                      source: 'flash_rail',
+                      position: index,
+                    ),
+                child: Obx(() {
                 final expired = expiredState.value;
                 return Opacity(
                   opacity: expired ? 0.55 : 1,
@@ -128,7 +138,8 @@ class FlashDealsSection extends StatelessWidget {
                     ),
                   ),
                 );
-              });
+              }),
+              );
             },
           ),
         ),
