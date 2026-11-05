@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
 import '../model/cart_item_model.dart';
@@ -117,6 +119,9 @@ class CartService extends GetxService {
     if (pendingAdd != null) {
       pendingAdd.cancelled = true;
       existing.pendingReservations--;
+    } else if (existing.reservations.isNotEmpty) {
+      final reservation = existing.reservations.removeLast();
+      unawaited(_releaseReservation(reservation.id));
     }
 
     existing.quantity--;
@@ -129,13 +134,30 @@ class CartService extends GetxService {
   }
 
   void remove(int dealId) {
-    items.removeWhere((i) => i.deal.id == dealId);
+    final item = items.firstWhereOrNull((i) => i.deal.id == dealId);
+    if (item == null) return;
+
+    _cancelPendingAdds(dealId);
+    items.remove(item);
     _recount();
+
+    _releaseReservations(item);
+    item.reservations.clear();
   }
 
   void clear() {
+    final removedItems = items.toList();
+    for (final item in removedItems) {
+      _cancelPendingAdds(item.deal.id);
+    }
+
     items.clear();
     _recount();
+
+    for (final item in removedItems) {
+      _releaseReservations(item);
+      item.reservations.clear();
+    }
   }
 
   void removeExpiredItems() {
@@ -160,6 +182,19 @@ class CartService extends GetxService {
     }
   }
 
+  void _releaseReservations(CartItemModel item) {
+    for (final reservation in item.reservations) {
+      unawaited(_releaseReservation(reservation.id));
+    }
+  }
+
+  void _cancelPendingAdds(int dealId) {
+    for (final pendingAdd
+        in _pendingAddsByDeal[dealId] ?? const <_PendingCartAdd>[]) {
+      pendingAdd.cancelled = true;
+    }
+  }
+
   void _recount() {
     itemCount.value = items.fold(0, (sum, i) => sum + i.quantity);
   }
@@ -174,6 +209,11 @@ class CartService extends GetxService {
     if (expiredItems.isEmpty) return [];
 
     final expiredIds = expiredItems.map((item) => item.deal.id).toSet();
+    for (final item in expiredItems) {
+      _cancelPendingAdds(item.deal.id);
+      _releaseReservations(item);
+      item.reservations.clear();
+    }
     items.removeWhere((item) => expiredIds.contains(item.deal.id));
     _recount();
 
