@@ -32,6 +32,7 @@ class AnalyticsService extends GetxService {
   final List<AnalyticsEvent> _pendingEvents = [];
   Timer? _flushTimer;
   bool _isSending = false;
+  bool _isClosing = false;
 
   AnalyticsService({required FakeApiService api}) : _api = api;
 
@@ -83,7 +84,12 @@ class AnalyticsService extends GetxService {
   }
 
   void _scheduleFlushForFirstPendingEvent({bool retryAfterFailure = false}) {
-    if (_pendingEvents.isEmpty || _flushTimer != null || _isSending) return;
+    if (_isClosing ||
+        _pendingEvents.isEmpty ||
+        _flushTimer != null ||
+        _isSending) {
+      return;
+    }
 
     final delay = retryAfterFailure
         ? _batchInterval
@@ -122,12 +128,32 @@ class AnalyticsService extends GetxService {
       _isSending = false;
 
       if (_pendingEvents.isNotEmpty) {
-        if (sent && _pendingEvents.length >= _batchSize) {
+        if (_isClosing && sent) {
+          // A send may have been in progress when the service started closing.
+          unawaited(_flushPendingEvents());
+        } else if (_isClosing) {
+          // Keep failed events in memory, but don't start a timer for a closed service.
+        } else if (sent && _pendingEvents.length >= _batchSize) {
           unawaited(_flushPendingEvents());
         } else {
           _scheduleFlushForFirstPendingEvent(retryAfterFailure: !sent);
         }
       }
     }
+  }
+
+  @override
+  void onClose() {
+    _isClosing = true;
+    _flushTimer?.cancel();
+    _flushTimer = null;
+
+    // Flush even a partial batch during teardown. GetX's onClose hook is
+    // synchronous, so this is a best-effort asynchronous send.
+    if (_pendingEvents.isNotEmpty && !_isSending) {
+      unawaited(_flushPendingEvents());
+    }
+
+    super.onClose();
   }
 }
